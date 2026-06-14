@@ -1,0 +1,48 @@
+name: CD (deploy Lambda code)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Test and deploy Lambda code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dev dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Unit tests (gate before deploy)
+        env:
+          AWS_DEFAULT_REGION: us-east-1
+        run: pytest -q
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+
+      - name: Package and deploy chat Lambda
+        run: |
+          (cd orchestrator && zip -r ../chat.zip . -x '*.pyc' '__pycache__/*')
+          aws lambda update-function-code \
+            --function-name agent-platform-chat \
+            --zip-file fileb://chat.zip
+
+      - name: Package and deploy ingest Lambda
+        run: |
+          (cd ingestion && zip -r ../ingest.zip . -x '*.pyc' '__pycache__/*')
+          aws lambda update-function-code \
+            --function-name agent-platform-ingest \
+            --zip-file fileb://ingest.zip
