@@ -26,11 +26,18 @@ EMB_MODEL = os.environ.get("EMBEDDINGS_MODEL", "jina-embeddings-v3")
 SEARCH_TOP_K = int(os.environ.get("SEARCH_TOP_K", "3"))
 
 SYSTEM_PROMPT = (
-    "You are a helpful assistant with access to tools and memory of the "
-    "conversation so far. Use search_corpus whenever the user asks about "
-    "internal, company, or document-specific facts, and base your answer on "
-    "the passages it returns. Use the other tools for the current time or "
-    "exact arithmetic. After using tools, give a clear, concise final answer."
+    "You are a helpful assistant for a specific organization, with tools and "
+    "memory of the conversation so far. You have no inherent knowledge of the "
+    "organization's handbook, policies, people, procedures, numbers, or facts. "
+    "For ANY question about the company or its documents, you MUST call "
+    "search_corpus and base your answer only on the passages it returns; never "
+    "answer such a question from general knowledge and never guess. If "
+    "search_corpus returns nothing relevant, say you do not have that "
+    "information. Answer questions about the user or about earlier parts of this "
+    "conversation (for example, the user's name) from memory, without "
+    "searching. Use get_current_time for the current time and calculate for "
+    "exact arithmetic. Call at most one tool per step, and after using tools "
+    "give a clear, concise final answer grounded in what you retrieved."
 )
 
 table = boto3.resource("dynamodb").Table(TABLE_NAME)
@@ -167,12 +174,9 @@ def _scan_chunks():
         kwargs["ExclusiveStartKey"] = resp["LastEvaluatedKey"]
 
 
-def _tool_search_corpus(args):
-    query = str(args.get("query", "")).strip()
-    if not query:
-        return "Empty query."
-    if chunks_table is None:
-        return "No corpus is configured."
+def _search_corpus_hits(query):
+    if chunks_table is None or not query:
+        return []
     qvec = _embed_query(query)
     scored = []
     for it in _scan_chunks():
@@ -181,12 +185,26 @@ def _tool_search_corpus(args):
         except (KeyError, json.JSONDecodeError):
             continue
         scored.append((_cosine(qvec, vec), it.get("text", ""), it.get("doc_id", "")))
-    if not scored:
-        return "The corpus is empty; no passages to search."
     scored.sort(key=lambda x: x[0], reverse=True)
-    top = scored[:SEARCH_TOP_K]
+    return [
+        {"source": src, "score": round(float(score), 3), "text": text}
+        for score, text, src in scored[:SEARCH_TOP_K]
+    ]
+
+
+def _tool_search_corpus(args, sink=None):
+    query = str(args.get("query", "")).strip()
+    if not query:
+        return "Empty query."
+    if chunks_table is None:
+        return "No corpus is configured."
+    hits = _search_corpus_hits(query)
+    if not hits:
+        return "The corpus is empty; no passages to search."
+    if sink is not None:
+        sink.extend(hits)
     return "\n\n".join(
-        f"[source: {src} | score {score:.3f}]\n{text}" for score, text, src in top
+        f"[source: {h['source']} | score {h['score']:.3f}]\n{h['text']}" for h in hits
     )
 
 
@@ -224,9 +242,9 @@ def _load_history(session_id):
     return history
 
 
-def _call_model(messages):
+def _post_model(messages, tool_choice):
     payload = json.dumps(
-        {"model": LLM_MODEL, "messages": messages, "tools": TOOLS, "tool_choice": "auto"}
+        {"model": LLM_MODEL, "messages": messages, "tools": TOOLS, "tool_choice": tool_choice}
     ).encode("utf-8")
     req = urllib.request.Request(
         LLM_URL,
@@ -243,16 +261,31 @@ def _call_model(messages):
     return data["choices"][0]["message"]
 
 
+def _call_model(messages):
+    """Call the model, tolerating Groq's occasional malformed tool generation."""
+    for attempt in range(3):
+        try:
+            return _post_model(messages, "auto")
+        except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", "ignore")
+            if "tool_use_failed" in body:
+                if attempt < 2:
+                    continue
+                return _post_model(messages, "none")
+            raise
+
+
 def _run_agent(history, user_message):
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.extend(history)
     messages.append({"role": "user", "content": user_message})
     trace = []
+    citations = []
     for _ in range(MAX_ITERS):
         msg = _call_model(messages)
         tool_calls = msg.get("tool_calls")
         if not tool_calls:
-            return msg.get("content") or "", trace
+            return msg.get("content") or "", trace, citations
         messages.append(msg)
         for tc in tool_calls:
             name = tc["function"]["name"]
@@ -260,13 +293,16 @@ def _run_agent(history, user_message):
                 args = json.loads(tc["function"].get("arguments") or "{}")
             except json.JSONDecodeError:
                 args = {}
-            impl = TOOL_IMPLS.get(name)
-            result = impl(args) if impl else f"Unknown tool: {name}"
+            if name == "search_corpus":
+                result = _tool_search_corpus(args, citations)
+            else:
+                impl = TOOL_IMPLS.get(name)
+                result = impl(args) if impl else f"Unknown tool: {name}"
             trace.append({"tool": name, "args": args, "result": str(result)[:500]})
             messages.append(
                 {"role": "tool", "tool_call_id": tc["id"], "content": str(result)}
             )
-    return "I couldn't finish within the allowed number of steps.", trace
+    return "I couldn't finish within the allowed number of steps.", trace, citations
 
 
 def handler(event, context):
@@ -287,7 +323,7 @@ def handler(event, context):
     _save_turn(session_id, "user", message, user)
 
     try:
-        reply, trace = _run_agent(history, message)
+        reply, trace, citations = _run_agent(history, message)
     except urllib.error.HTTPError as e:
         return _resp(502, {"error": "Model call failed", "detail": e.read().decode("utf-8", "ignore")[:400]})
     except Exception as e:
@@ -295,7 +331,10 @@ def handler(event, context):
 
     _save_turn(session_id, "assistant", reply, user)
 
-    return _resp(200, {"session_id": session_id, "reply": reply, "tool_calls": trace})
+    return _resp(
+        200,
+        {"session_id": session_id, "reply": reply, "tool_calls": trace, "citations": citations},
+    )
 
 
 def _save_turn(session_id, role, content, user):

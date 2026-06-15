@@ -4,8 +4,7 @@ infra/.terraform/
 *.tfstate.*
 *.tfplan
 crash.log
-infra/chat.zip
-infra/ingest.zip
+infra/*.zip
 
 # Python
 __pycache__/

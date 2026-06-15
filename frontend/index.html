@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agent Platform</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #1a1d29; --panel2: #232735; --line: #2c3142;
+    --text: #e7e9ee; --muted: #9aa1b1; --accent: #6c8cff; --accent2: #57d9a3;
+    --user: #2b3a67; --bot: #232735;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: radial-gradient(1200px 600px at 70% -10%, #1b2030 0%, var(--bg) 60%);
+    color: var(--text); height: 100vh; display: flex; align-items: center; justify-content: center;
+  }
+  .card {
+    width: 100%; max-width: 760px; height: 90vh; max-height: 820px; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 18px; display: flex; flex-direction: column;
+    overflow: hidden; box-shadow: 0 30px 80px rgba(0,0,0,.45);
+  }
+  header {
+    padding: 16px 20px; border-bottom: 1px solid var(--line); display: flex; align-items: center;
+    justify-content: space-between; background: var(--panel2);
+  }
+  header h1 { font-size: 15px; margin: 0; letter-spacing: .2px; }
+  header .dot { color: var(--accent2); }
+  header button {
+    background: transparent; color: var(--muted); border: 1px solid var(--line);
+    padding: 6px 12px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  }
+  header button:hover { color: var(--text); border-color: var(--accent); }
+
+  #login { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; }
+  #login h2 { margin: 0 0 4px; font-weight: 600; }
+  #login p { color: var(--muted); margin: 0 0 12px; font-size: 14px; text-align: center; }
+  #login input {
+    width: 320px; max-width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); font-size: 14px;
+  }
+  #login input:focus { outline: none; border-color: var(--accent); }
+  #login button {
+    width: 320px; max-width: 100%; padding: 12px; border-radius: 10px; border: none; cursor: pointer;
+    background: var(--accent); color: white; font-size: 14px; font-weight: 600;
+  }
+  #login button:disabled { opacity: .6; cursor: default; }
+  .err { color: #ff8585; font-size: 13px; min-height: 16px; }
+
+  #chat { flex: 1; display: none; flex-direction: column; overflow: hidden; }
+  #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 82%; padding: 11px 14px; border-radius: 14px; font-size: 14px; line-height: 1.5; }
+  .msg .body { white-space: pre-wrap; }
+  .msg.user { align-self: flex-end; background: var(--user); border-bottom-right-radius: 4px; }
+  .msg.bot { align-self: flex-start; background: var(--bot); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+
+  .cites { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+  .cites-label { font-size: 10px; text-transform: uppercase; letter-spacing: .7px; color: var(--accent2); }
+  .cite { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; }
+  .cite-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .cite-src { font-size: 12px; color: var(--text); font-weight: 600; }
+  .cite-score { font-size: 11px; color: var(--accent2); font-variant-numeric: tabular-nums; }
+  .scorebar { height: 4px; background: var(--line); border-radius: 4px; overflow: hidden; margin-bottom: 7px; }
+  .scorebar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+  .cite-text { font-size: 12px; color: var(--muted); line-height: 1.45; white-space: pre-wrap; }
+
+  .meta { margin-top: 7px; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .tools { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .tools summary { cursor: pointer; color: var(--accent2); }
+  .tools pre { white-space: pre-wrap; background: var(--bg); padding: 8px; border-radius: 8px; margin: 6px 0 0; overflow-x: auto; }
+
+  .typing { align-self: flex-start; color: var(--muted); font-size: 13px; font-style: italic; }
+  .typing::after { content: ""; animation: dots 1.3s steps(1, end) infinite; }
+  @keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+
+  .toolchips { display: flex; gap: 6px; padding: 0 14px 12px; flex-wrap: wrap; }
+  .chip { font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 9px; background: var(--panel); }
+
+  #composer { display: flex; gap: 10px; padding: 14px; border-top: 1px solid var(--line); background: var(--panel2); }
+  #composer input {
+    flex: 1; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--text); font-size: 14px;
+  }
+  #composer input:focus { outline: none; border-color: var(--accent); }
+  #composer button { padding: 0 20px; border-radius: 10px; border: none; background: var(--accent); color: white; font-weight: 600; cursor: pointer; }
+  #composer button:disabled { opacity: .5; cursor: default; }
+</style>
+</head>
+<body>
+<div class="card">
+  <header>
+    <h1><span class="dot">&#9679;</span> Agent Platform <span style="color:var(--muted);font-weight:400">&middot; serverless RAG assistant</span></h1>
+    <button id="logoutBtn" style="display:none" onclick="logout()">Sign out</button>
+  </header>
+
+  <div id="login">
+    <h2>Sign in</h2>
+    <p>Authenticate with your Cognito user to start chatting.</p>
+    <input id="email" type="email" placeholder="email" value="demo@example.com" />
+    <input id="password" type="password" placeholder="password" />
+    <button id="loginBtn" onclick="doLogin()">Sign in</button>
+    <div class="err" id="loginErr"></div>
+  </div>
+
+  <div id="chat">
+    <div id="messages"></div>
+    <div class="toolchips">
+      <span class="chip">current time</span>
+      <span class="chip">calculator</span>
+      <span class="chip">handbook search (RAG)</span>
+      <span class="chip">session memory</span>
+    </div>
+    <div id="composer">
+      <input id="input" placeholder="Ask about the handbook, do math, get the time..." onkeydown="if(event.key==='Enter')send()" />
+      <button id="sendBtn" onclick="send()">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const CONFIG = {
+    apiUrl: "https://rtnalhd8n4.execute-api.us-east-1.amazonaws.com/prod/chat",
+    region: "us-east-1",
+    clientId: "ultj99slj61ssnudpr6u8c145",
+  };
+  let idToken = null;
+  let sessionId = null;
+
+  const $ = (id) => document.getElementById(id);
+
+  async function doLogin() {
+    const email = $("email").value.trim();
+    const password = $("password").value;
+    $("loginErr").textContent = "";
+    $("loginBtn").disabled = true;
+    $("loginBtn").textContent = "Signing in...";
+    try {
+      const res = await fetch("https://cognito-idp." + CONFIG.region + ".amazonaws.com/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/x-amz-json-1.1",
+          "X-Amz-Target": "AWSCognitoIdentityProviderService.InitiateAuth",
+        },
+        body: JSON.stringify({
+          AuthFlow: "USER_PASSWORD_AUTH",
+          ClientId: CONFIG.clientId,
+          AuthParameters: { USERNAME: email, PASSWORD: password },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.AuthenticationResult) {
+        throw new Error(data.message || "Login failed");
+      }
+      idToken = data.AuthenticationResult.IdToken;
+      $("login").style.display = "none";
+      $("chat").style.display = "flex";
+      $("logoutBtn").style.display = "block";
+      $("input").focus();
+      addMessage("bot", "Hi! I'm your agent. I can answer from the ingested handbook, do exact math, and tell the time. Try: \"What is the incident hotline extension?\"");
+    } catch (e) {
+      $("loginErr").textContent = e.message;
+    } finally {
+      $("loginBtn").disabled = false;
+      $("loginBtn").textContent = "Sign in";
+    }
+  }
+
+  function logout() {
+    idToken = null; sessionId = null;
+    $("messages").innerHTML = "";
+    $("chat").style.display = "none";
+    $("logoutBtn").style.display = "none";
+    $("login").style.display = "flex";
+  }
+
+  function renderCitations(citations) {
+    const wrap = document.createElement("div");
+    wrap.className = "cites";
+    const label = document.createElement("div");
+    label.className = "cites-label";
+    label.textContent = "Retrieved from corpus";
+    wrap.appendChild(label);
+    citations.forEach((c) => {
+      const card = document.createElement("div");
+      card.className = "cite";
+      const top = document.createElement("div");
+      top.className = "cite-top";
+      const src = document.createElement("span");
+      src.className = "cite-src";
+      src.textContent = c.source || "document";
+      const score = document.createElement("span");
+      score.className = "cite-score";
+      const pct = Math.max(0, Math.min(1, Number(c.score) || 0));
+      score.textContent = "similarity " + pct.toFixed(3);
+      top.appendChild(src); top.appendChild(score);
+      const bar = document.createElement("div");
+      bar.className = "scorebar";
+      const fill = document.createElement("i");
+      fill.style.width = (pct * 100).toFixed(0) + "%";
+      bar.appendChild(fill);
+      const txt = document.createElement("div");
+      txt.className = "cite-text";
+      let t = (c.text || "").trim();
+      if (t.length > 360) t = t.slice(0, 360) + "\u2026";
+      txt.textContent = t;
+      card.appendChild(top); card.appendChild(bar); card.appendChild(txt);
+      wrap.appendChild(card);
+    });
+    return wrap;
+  }
+
+  function addMessage(role, text, tools, citations, meta) {
+    const div = document.createElement("div");
+    div.className = "msg " + role;
+    const body = document.createElement("div");
+    body.className = "body";
+    body.textContent = text;
+    div.appendChild(body);
+
+    if (citations && citations.length) {
+      div.appendChild(renderCitations(citations));
+    }
+
+    const metaParts = [];
+    if (meta && meta.ms != null) metaParts.push((meta.ms / 1000).toFixed(2) + " s");
+    if (tools && tools.length) metaParts.push(tools.length + " tool call" + (tools.length > 1 ? "s" : ""));
+    if (metaParts.length) {
+      const m = document.createElement("div");
+      m.className = "meta";
+      m.textContent = metaParts.join("  \u00b7  ");
+      div.appendChild(m);
+    }
+
+    if (tools && tools.length) {
+      const d = document.createElement("details");
+      d.className = "tools";
+      const s = document.createElement("summary");
+      s.textContent = "view trace";
+      const pre = document.createElement("pre");
+      pre.textContent = JSON.stringify(tools, null, 2);
+      d.appendChild(s); d.appendChild(pre); div.appendChild(d);
+    }
+
+    $("messages").appendChild(div);
+    $("messages").scrollTop = $("messages").scrollHeight;
+    return div;
+  }
+
+  async function send() {
+    const text = $("input").value.trim();
+    if (!text) return;
+    $("input").value = "";
+    addMessage("user", text);
+    $("sendBtn").disabled = true;
+    const typing = document.createElement("div");
+    typing.className = "typing"; typing.textContent = "agent is thinking";
+    $("messages").appendChild(typing);
+    $("messages").scrollTop = $("messages").scrollHeight;
+    const t0 = performance.now();
+    try {
+      const res = await fetch(CONFIG.apiUrl, {
+        method: "POST",
+        headers: { "Authorization": idToken, "Content-Type": "application/json" },
+        body: JSON.stringify({ message: text, session_id: sessionId }),
+      });
+      const data = await res.json();
+      const ms = Math.round(performance.now() - t0);
+      typing.remove();
+      if (data.session_id) sessionId = data.session_id;
+      if (data.reply) addMessage("bot", data.reply, data.tool_calls, data.citations, { ms });
+      else addMessage("bot", "Error: " + (data.error || JSON.stringify(data)), null, null, { ms });
+    } catch (e) {
+      typing.remove();
+      addMessage("bot", "Request failed: " + e.message);
+    } finally {
+      $("sendBtn").disabled = false;
+      $("input").focus();
+    }
+  }
+</script>
+</body>
+</html>

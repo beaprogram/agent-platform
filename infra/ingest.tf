@@ -21,6 +21,8 @@ resource "aws_lambda_function" "ingest" {
       EMBEDDINGS_SECRET_ARN = aws_secretsmanager_secret.embeddings_key.arn
       EMBEDDINGS_API_URL    = "https://api.jina.ai/v1/embeddings"
       EMBEDDINGS_MODEL      = "jina-embeddings-v3"
+      CHUNK_SIZE            = "200"
+      CHUNK_OVERLAP         = "40"
     }
   }
 }

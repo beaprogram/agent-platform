@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import time
 import urllib.request
 from urllib.parse import unquote_plus
@@ -12,6 +13,9 @@ EMB_URL = os.environ.get("EMBEDDINGS_API_URL", "https://api.jina.ai/v1/embedding
 EMB_MODEL = os.environ.get("EMBEDDINGS_MODEL", "jina-embeddings-v3")
 CHUNK_SIZE = int(os.environ.get("CHUNK_SIZE", "800"))
 CHUNK_OVERLAP = int(os.environ.get("CHUNK_OVERLAP", "100"))
+CHUNK_MIN = int(os.environ.get("CHUNK_MIN", "30"))
+
+_SENT_SPLIT = re.compile(r"(?<=[.!?])\s+|\n+")
 EMBED_BATCH = 32
 
 s3 = boto3.client("s3")
@@ -31,19 +35,18 @@ def _chunk(text):
     text = text.strip()
     if not text:
         return []
-    chunks, start, n = [], 0, len(text)
-    while start < n:
-        end = min(start + CHUNK_SIZE, n)
-        if end < n:
-            ws = text.rfind(" ", start, end)
-            if ws > start:
-                end = ws
-        piece = text[start:end].strip()
-        if piece:
-            chunks.append(piece)
-        if end >= n:
-            break
-        start = max(end - CHUNK_OVERLAP, start + 1)
+    sentences = [s.strip() for s in _SENT_SPLIT.split(text) if s.strip()]
+    chunks = []
+    for sent in sentences:
+        while len(sent) > CHUNK_SIZE:
+            chunks.append(sent[:CHUNK_SIZE].strip())
+            sent = sent[CHUNK_SIZE:].strip()
+        if not sent:
+            continue
+        if chunks and len(chunks[-1]) < CHUNK_MIN:
+            chunks[-1] = (chunks[-1] + " " + sent).strip()
+        else:
+            chunks.append(sent)
     return chunks
 
 
