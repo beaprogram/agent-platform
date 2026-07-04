@@ -1,6 +1,8 @@
 name: CD (deploy Lambda code)
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

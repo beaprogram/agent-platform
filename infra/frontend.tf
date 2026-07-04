@@ -25,6 +25,9 @@ data "archive_file" "frontend" {
 }
 
 resource "aws_lambda_function" "frontend" {
+  tracing_config {
+    mode = "Active"
+  }
   function_name    = "${var.project_name}-frontend"
   role             = data.aws_iam_role.lab.arn
   runtime          = "python3.12"

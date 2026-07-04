@@ -6,6 +6,9 @@ data "archive_file" "chat" {
 }
 
 resource "aws_lambda_function" "chat" {
+  tracing_config {
+    mode = "Active"
+  }
   function_name    = "${var.project_name}-chat"
   role             = data.aws_iam_role.lab.arn
   runtime          = "python3.12"

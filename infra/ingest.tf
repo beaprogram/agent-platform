@@ -6,6 +6,9 @@ data "archive_file" "ingest" {
 }
 
 resource "aws_lambda_function" "ingest" {
+  tracing_config {
+    mode = "Active"
+  }
   function_name    = "${var.project_name}-ingest"
   role             = data.aws_iam_role.lab.arn
   runtime          = "python3.12"
