@@ -331,7 +331,9 @@ def handler(event, context):
     try:
         reply, trace, citations = _run_agent(history, message)
     except urllib.error.HTTPError as e:
-        return _resp(502, {"error": "Model call failed", "detail": e.read().decode("utf-8", "ignore")[:400]})
+        body = e.read().decode("utf-8", "ignore")[:400]
+        print(f"MODEL_CALL_FAILED status={getattr(e, 'code', '?')} body={body!r}")
+        return _resp(502, {"error": "Model call failed", "detail": body})
     except Exception as e:
         return _resp(502, {"error": "Agent failed", "detail": str(e)})
 
