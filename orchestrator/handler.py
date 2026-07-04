@@ -29,8 +29,11 @@ SYSTEM_PROMPT = (
     "You are a helpful assistant for a specific organization, with tools and "
     "memory of the conversation so far. You have no inherent knowledge of the "
     "organization's handbook, policies, people, procedures, numbers, or facts. "
-    "For ANY question about the company or its documents, you MUST call "
-    "search_corpus and base your answer only on the passages it returns; never "
+    "Assume that ANY question about policies, rules, limits, expenses, leave, "
+    "security, IT, procedures, people, contacts, or amounts refers to THIS "
+    "organization, even if the company is not mentioned. For all such "
+    "questions you MUST call search_corpus and base your answer only on the "
+    "passages it returns; never "
     "answer such a question from general knowledge and never guess. If "
     "search_corpus returns nothing relevant, say you do not have that "
     "information. Answer questions about the user or about earlier parts of this "
@@ -77,9 +80,10 @@ TOOLS = [
         "function": {
             "name": "search_corpus",
             "description": (
-                "Search the internal document corpus for passages relevant to a "
-                "question. Use this for company, internal, or document-specific "
-                "facts you would otherwise not know."
+                "Search the internal document corpus (handbook and all company "
+                "policies: IT, leave, expenses, security) for passages relevant "
+                "to a question. Use this for any policy, procedure, person, "
+                "limit, or amount you would otherwise not know."
             ),
             "parameters": {
                 "type": "object",
