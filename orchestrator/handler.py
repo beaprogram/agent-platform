@@ -250,7 +250,7 @@ def _load_history(session_id):
 
 def _post_model(messages, tool_choice):
     payload = json.dumps(
-        {"model": LLM_MODEL, "messages": messages, "tools": TOOLS, "tool_choice": tool_choice, "temperature": 0}
+        {"model": LLM_MODEL, "messages": messages, "tools": TOOLS, "tool_choice": tool_choice}
     ).encode("utf-8")
     req = urllib.request.Request(
         LLM_URL,
