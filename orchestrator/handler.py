@@ -36,7 +36,9 @@ SYSTEM_PROMPT = (
     "passages it returns; never "
     "answer such a question from general knowledge and never guess. If "
     "search_corpus returns nothing relevant, say you do not have that "
-    "information. Answer questions about the user or about earlier parts of this "
+    "information. If you are ever uncertain whether a question needs the corpus, "
+    "call search_corpus first rather than declining. Answer questions about the "
+    "user or about earlier parts of this "
     "conversation (for example, the user's name) from memory, without "
     "searching. Use get_current_time for the current time and calculate for "
     "exact arithmetic. Call at most one tool per step, and after using tools "
@@ -248,7 +250,7 @@ def _load_history(session_id):
 
 def _post_model(messages, tool_choice):
     payload = json.dumps(
-        {"model": LLM_MODEL, "messages": messages, "tools": TOOLS, "tool_choice": tool_choice}
+        {"model": LLM_MODEL, "messages": messages, "tools": TOOLS, "tool_choice": tool_choice, "temperature": 0}
     ).encode("utf-8")
     req = urllib.request.Request(
         LLM_URL,
